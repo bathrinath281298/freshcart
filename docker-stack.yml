@@ -1,51 +1,33 @@
----
+version: "3.8"
+
 services:
 
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: freshcart
-      MYSQL_USER: freshcart
-      MYSQL_PASSWORD: freshcart123
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    networks:
-      - freshcart-network
-    deploy:
-      replicas: 1
-
   backend:
-    image: bathri98/freshcart-backend:latest
-    environment:
-      DB_HOST: mysql
-      DB_USER: freshcart
-      DB_PASSWORD: freshcart123
-      DB_NAME: freshcart
+    image: bathri98/freshcart-backend:${TAG}
     ports:
       - "5000:5000"
     networks:
       - freshcart-network
-    depends_on:
-      - mysql
-    deploy:
-      replicas: 1
 
   frontend:
-    image: bathri98/freshcart-frontend:latest
+    image: bathri98/freshcart-frontend:${TAG}
     ports:
       - "80:80"
     networks:
       - freshcart-network
-    depends_on:
-      - backend
-    deploy:
-      replicas: 1
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: yourpassword
+      MYSQL_DATABASE: freshcart
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - freshcart-network
 
 networks:
   freshcart-network:
-    driver: overlay
 
 volumes:
-  mysql_data:
+  mysql-data:
