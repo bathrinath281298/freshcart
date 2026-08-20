@@ -16,7 +16,7 @@ import "./App.css";
 const products = [
   {
     id: 1,
-    name: "Fresh kashmir apple",
+    name: "Fresh swiss apple",
     category: "Fruits",
     price: 120,
     description: "Sweet and juicy red apples",
