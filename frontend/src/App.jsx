@@ -1,4 +1,6 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+
 import {
   ShoppingCart,
   Search,
@@ -13,115 +15,98 @@ import {
 
 import "./App.css";
 
-const products = [
-  {
-    id: 1,
-    name: "Fresh swiss apple",
-    category: "Fruits",
-    price: 120,
-    description: "Sweet and juicy red apples",
-    image: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6"
-  },
-  {
-    id: 2,
-    name: "Fresh Tomatoes",
-    category: "Vegetables",
-    price: 40,
-    description: "Farm fresh red tomatoes",
-    image: "https://images.unsplash.com/photo-1546094096-0df4bcaaa337"
-  },
-  {
-    id: 3,
-    name: "Fresh Milk",
-    category: "Dairy",
-    price: 60,
-    description: "Pure and creamy fresh milk",
-    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b"
-  },
-  {
-    id: 4,
-    name: "Fresh Carrots",
-    category: "Vegetables",
-    price: 55,
-    description: "Crunchy farm fresh carrots",
-    image: "https://images.unsplash.com/photo-1445282768818-728615cc910a"
-  },
-  {
-    id: 5,
-    name: "Fresh Bread",
-    category: "Bakery",
-    price: 45,
-    description: "Soft freshly baked bread",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff"
-  },
-  {
-    id: 6,
-    name: "Bananas",
-    category: "Fruits",
-    price: 60,
-    description: "Naturally sweet bananas",
-    image: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e"
-  },
-  {
-    id: 7,
-    name: "Broccoli",
-    category: "Vegetables",
-    price: 80,
-    description: "Fresh green broccoli",
-    image: "https://images.unsplash.com/photo-1459411621453-7b03977f4bfc"
-  },
-  {
-    id: 8,
-    name: "Cheese",
-    category: "Dairy",
-    price: 150,
-    description: "Creamy premium cheese",
-    image: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d"
-  }
-];
-
 function App() {
 
+  // CART STATE
   const [cart, setCart] = useState([]);
+
+  // PRODUCT STATE
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // SEARCH AND CATEGORY STATE
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
 
+  // CHECKOUT STATE
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [orderMessage, setOrderMessage] = useState("");
+
+  // FETCH PRODUCTS FROM PRODUCT SERVICE
+  useEffect(() => {
+
+    const fetchProducts = async () => {
+
+      try {
+
+        const response = await fetch("/api/products");
+
+        if (!response.ok) {
+          throw new Error("Unable to fetch products");
+        }
+
+        const data = await response.json();
+
+        setProducts(data);
+
+      } catch (err) {
+
+        setError(err.message);
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    fetchProducts();
+
+  }, []);
+
+  // ADD PRODUCT TO CART
   const addToCart = (product) => {
 
-    const existing = cart.find(
-      item => item.id === product.id
-    );
+    setCart(previousCart => {
 
-    if (existing) {
+      const existing = previousCart.find(
+        item => item.id === product.id
+      );
 
-      setCart(
-        cart.map(item =>
+      if (existing) {
+
+        return previousCart.map(item =>
           item.id === product.id
             ? {
                 ...item,
                 quantity: item.quantity + 1
               }
             : item
-        )
-      );
+        );
 
-    } else {
+      }
 
-      setCart([
-        ...cart,
+      return [
+        ...previousCart,
         {
           ...product,
           quantity: 1
         }
-      ]);
+      ];
 
-    }
+    });
+
+    setOrderMessage("");
+
   };
 
+  // INCREASE QUANTITY
   const increase = (id) => {
 
-    setCart(
-      cart.map(item =>
+    setCart(previousCart =>
+      previousCart.map(item =>
         item.id === id
           ? {
               ...item,
@@ -133,10 +118,11 @@ function App() {
 
   };
 
+  // DECREASE QUANTITY
   const decrease = (id) => {
 
-    setCart(
-      cart
+    setCart(previousCart =>
+      previousCart
         .map(item =>
           item.id === id
             ? {
@@ -150,14 +136,16 @@ function App() {
 
   };
 
+  // REMOVE PRODUCT
   const removeItem = (id) => {
 
-    setCart(
-      cart.filter(item => item.id !== id)
+    setCart(previousCart =>
+      previousCart.filter(item => item.id !== id)
     );
 
   };
 
+  // FILTER PRODUCTS
   const filteredProducts = products.filter(product => {
 
     const matchesSearch =
@@ -173,17 +161,176 @@ function App() {
 
   });
 
+  // CART TOTAL
   const total = cart.reduce(
     (sum, item) =>
-      sum + item.price * item.quantity,
+      sum + Number(item.price) * item.quantity,
     0
   );
 
+  // CART COUNT
   const cartCount = cart.reduce(
     (sum, item) =>
       sum + item.quantity,
     0
   );
+
+  // CHECKOUT FUNCTION
+  const checkout = async () => {
+
+    if (cart.length === 0) {
+
+      alert("Your cart is empty");
+      return;
+
+    }
+
+    const name = window.prompt("Enter your name:");
+
+    if (!name || !name.trim()) {
+      return;
+    }
+
+    const email = window.prompt("Enter your email:");
+
+    if (!email || !email.trim()) {
+      return;
+    }
+
+    setCheckingOut(true);
+    setOrderMessage("");
+
+    try {
+
+      // STEP 1: REGISTER CUSTOMER THROUGH USER SERVICE
+
+      const userResponse = await fetch("/api/users", {
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim()
+        })
+
+      });
+
+      const userData = await userResponse.json();
+
+      let userId;
+
+      if (userResponse.status === 409) {
+
+        // EMAIL ALREADY EXISTS - LOOK UP EXISTING CUSTOMER
+
+        const existingUserResponse = await fetch("/api/users");
+
+        if (!existingUserResponse.ok) {
+          throw new Error("Unable to retrieve existing customer");
+        }
+
+        const existingUsers = await existingUserResponse.json();
+
+        const existingUser = existingUsers.find(
+          user =>
+            user.email.toLowerCase() === email.trim().toLowerCase()
+        );
+
+        if (!existingUser) {
+          throw new Error("Existing customer could not be found");
+        }
+
+        userId = existingUser.id;
+
+      } else if (!userResponse.ok) {
+
+        throw new Error(
+          userData.error || "Customer registration failed"
+        );
+
+      } else {
+
+        userId = userData.user_id;
+
+      }
+
+      // STEP 2: PLACE ORDERS THROUGH ORDER SERVICE
+
+      const orderResults = [];
+
+      for (const item of cart) {
+
+        const orderResponse = await fetch("/api/orders", {
+
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+
+            user_id: userId,
+
+            product_id: item.id,
+
+            quantity: item.quantity
+
+          })
+
+        });
+
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok) {
+
+          throw new Error(
+            orderData.error || "Unable to place order"
+          );
+
+        }
+
+        orderResults.push(orderData);
+
+      }
+
+      // STEP 3: SHOW ORDER CONFIRMATION
+
+      const orderIds = orderResults
+        .map(order => order.order_id)
+        .join(", ");
+
+      const finalTotal = orderResults.reduce(
+        (sum, order) =>
+          sum + Number(order.total_price),
+        0
+      );
+
+      setOrderMessage(
+        `Order placed successfully! Order ID(s): ${orderIds}. Total: ₹${finalTotal.toFixed(2)}`
+      );
+
+      // CLEAR CART AFTER SUCCESSFUL ORDER
+
+      setCart([]);
+
+    } catch (err) {
+
+      setOrderMessage(
+        `Checkout failed: ${err.message}`
+      );
+
+    } finally {
+
+      setCheckingOut(false);
+
+    }
+
+  };
 
   return (
 
@@ -277,47 +424,27 @@ function App() {
 
         <div className="category-list">
 
-          <button
-            onClick={() =>
-              setCategory("All")
-            }
-          >
+          <button onClick={() => setCategory("All")}>
             🛍️
             <span>All</span>
           </button>
 
-          <button
-            onClick={() =>
-              setCategory("Fruits")
-            }
-          >
+          <button onClick={() => setCategory("Fruits")}>
             <Apple />
             <span>Fruits</span>
           </button>
 
-          <button
-            onClick={() =>
-              setCategory("Vegetables")
-            }
-          >
+          <button onClick={() => setCategory("Vegetables")}>
             <Carrot />
             <span>Vegetables</span>
           </button>
 
-          <button
-            onClick={() =>
-              setCategory("Dairy")
-            }
-          >
+          <button onClick={() => setCategory("Dairy")}>
             <Milk />
             <span>Dairy</span>
           </button>
 
-          <button
-            onClick={() =>
-              setCategory("Bakery")
-            }
-          >
+          <button onClick={() => setCategory("Bakery")}>
             <Cookie />
             <span>Bakery</span>
           </button>
@@ -354,7 +481,19 @@ function App() {
 
         <div className="product-grid">
 
-          {filteredProducts.map(product => (
+          {loading && (
+            <p>Loading products...</p>
+          )}
+
+          {error && (
+            <p>{error}</p>
+          )}
+
+          {!loading && !error && filteredProducts.length === 0 && (
+            <p>No products found.</p>
+          )}
+
+          {!loading && !error && filteredProducts.map(product => (
 
             <div
               className="product-card"
@@ -387,13 +526,11 @@ function App() {
                 <div className="product-bottom">
 
                   <strong>
-                    ₹{product.price}
+                    ₹{Number(product.price).toFixed(2)}
                   </strong>
 
                   <button
-                    onClick={() =>
-                      addToCart(product)
-                    }
+                    onClick={() => addToCart(product)}
                   >
                     <Plus size={17} />
                     Add
@@ -469,7 +606,7 @@ function App() {
                   </h3>
 
                   <strong>
-                    ₹{item.price}
+                    ₹{Number(item.price).toFixed(2)}
                   </strong>
 
                 </div>
@@ -477,9 +614,7 @@ function App() {
                 <div className="quantity">
 
                   <button
-                    onClick={() =>
-                      decrease(item.id)
-                    }
+                    onClick={() => decrease(item.id)}
                   >
                     <Minus size={15} />
                   </button>
@@ -489,9 +624,7 @@ function App() {
                   </span>
 
                   <button
-                    onClick={() =>
-                      increase(item.id)
-                    }
+                    onClick={() => increase(item.id)}
                   >
                     <Plus size={15} />
                   </button>
@@ -499,14 +632,14 @@ function App() {
                 </div>
 
                 <strong>
-                  ₹{item.price * item.quantity}
+                  ₹{(
+                    Number(item.price) * item.quantity
+                  ).toFixed(2)}
                 </strong>
 
                 <button
                   className="delete"
-                  onClick={() =>
-                    removeItem(item.id)
-                  }
+                  onClick={() => removeItem(item.id)}
                 >
                   <Trash2 size={18} />
                 </button>
@@ -525,19 +658,30 @@ function App() {
                 </span>
 
                 <strong>
-                  ₹{total}
+                  ₹{total.toFixed(2)}
                 </strong>
 
               </div>
 
-              <button>
-                Proceed to Checkout
+              <button
+                onClick={checkout}
+                disabled={checkingOut}
+              >
+                {checkingOut
+                  ? "Processing..."
+                  : "Proceed to Checkout"}
               </button>
 
             </div>
 
           </>
 
+        )}
+
+        {orderMessage && (
+          <p role="status">
+            {orderMessage}
+          </p>
         )}
 
       </section>
@@ -560,6 +704,7 @@ function App() {
     </div>
 
   );
+
 }
 
 export default App;
