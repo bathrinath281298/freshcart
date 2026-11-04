@@ -1,0 +1,115 @@
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: freshcart-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: freshcart
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - freshcart-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  user-service:
+    build: ./user-service
+    image: freshcart-user:1.0
+    container_name: user-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: freshcart
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - freshcart-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  product-service:
+    build: ./product-service
+    image: freshcart-product:1.0
+    container_name: product-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: freshcart
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - freshcart-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  order-service:
+    build: ./order-service
+    image: freshcart-order:1.0
+    container_name: order-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: freshcart
+      USER_SERVICE_URL: http://user-service:5001
+      PRODUCT_SERVICE_URL: http://product-service:5002
+    depends_on:
+      mysql:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    networks:
+      - freshcart-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    image: freshcart-frontend:1.0
+    container_name: freshcart-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    networks:
+      - freshcart-network
+
+volumes:
+  mysql-data:
+
+networks:
+  freshcart-network:
+    driver: bridge
