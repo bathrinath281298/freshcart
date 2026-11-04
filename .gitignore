@@ -1,0 +1,11 @@
+.env
+*.pem
+*.key
+*.ppk
+__pycache__/
+*.pyc
+.venv/
+venv/
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
