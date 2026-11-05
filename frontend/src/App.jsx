@@ -341,7 +341,7 @@ function App() {
       <header>
 
         <div className="logo">
-          🛒 FreshCart
+          🛒 FreshCart daily
         </div>
 
         <div className="search">
